@@ -110,8 +110,9 @@ export default function ChatPage() {
         const res = await api.post('/contracts', {
           title: `Hợp đồng thương mại điện tử với ${partner.name}`,
           supplierId: partner.companyId,
-          value: 0, // Giá trị rỗng để Supplier vào điền
+          value: 0, // Giá trị rỗng để Supplier vào điền (hoặc sẽ được backend autofill nếu có rfq)
           currency: 'VND',
+          rfqId: activeChat.rfqId || undefined,
         });
         alert('Tạo nháp hợp đồng thành công! Đang chuyển hướng...');
         router.push(`/contracts/${res.data.id}`);

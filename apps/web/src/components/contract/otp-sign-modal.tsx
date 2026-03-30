@@ -6,13 +6,13 @@ import { SignatureCanvas } from './signature-canvas';
 interface OtpSignModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSign: (otp: string, signatureImage: string) => Promise<void>;
+  onSign: (otp: string, signatureImage: string, stampUrl: string, signerTitle: string) => Promise<void>;
   onRequestOtp: () => Promise<{ otp?: string; email?: string; message?: string }>;
   signerName: string;
   email?: string;
 }
 
-type Step = 'request' | 'otp' | 'sign' | 'done';
+type Step = 'request' | 'otp' | 'details' | 'sign' | 'done';
 
 export function OtpSignModal({ isOpen, onClose, onSign, onRequestOtp, signerName, email }: OtpSignModalProps) {
   const [step, setStep] = useState<Step>('request');
@@ -20,6 +20,8 @@ export function OtpSignModal({ isOpen, onClose, onSign, onRequestOtp, signerName
   const [otpValue, setOtpValue] = useState(['', '', '', '', '', '']);
   const [devOtp, setDevOtp] = useState<string>(''); // Hiển thị OTP trong chế độ dev
   const [signatureImage, setSignatureImage] = useState<string>('');
+  const [stampImage, setStampImage] = useState<string>('');
+  const [signerTitle, setSignerTitle] = useState('');
   const [error, setError] = useState('');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -29,6 +31,8 @@ export function OtpSignModal({ isOpen, onClose, onSign, onRequestOtp, signerName
       setOtpValue(['', '', '', '', '', '']);
       setDevOtp('');
       setSignatureImage('');
+      setStampImage('');
+      setSignerTitle('');
       setError('');
     }
   }, [isOpen]);
@@ -68,6 +72,23 @@ export function OtpSignModal({ isOpen, onClose, onSign, onRequestOtp, signerName
     const code = otpValue.join('');
     if (code.length < 6) { setError('Vui lòng nhập đủ 6 chữ số.'); return; }
     setError('');
+    setStep('details');
+  };
+
+  const handleStampUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) return setError('File mộc quá lớn (<2MB)');
+    const reader = new FileReader();
+    reader.onload = () => setStampImage(reader.result as string);
+    reader.readAsDataURL(file);
+    setError('');
+  };
+
+  const handleDetailsConfirm = () => {
+    if (!signerTitle.trim()) return setError('Vui lòng nhập chức danh.');
+    if (!stampImage) return setError('Vui lòng tải lên ảnh con dấu.');
+    setError('');
     setStep('sign');
   };
 
@@ -81,7 +102,7 @@ export function OtpSignModal({ isOpen, onClose, onSign, onRequestOtp, signerName
     setLoading(true);
     setError('');
     try {
-      await onSign(otpValue.join(''), imgData);
+      await onSign(otpValue.join(''), imgData, stampImage, signerTitle);
       setStep('done');
     } catch (e: any) {
       setError(e.response?.data?.message || 'Ký tên thất bại.');
@@ -115,22 +136,23 @@ export function OtpSignModal({ isOpen, onClose, onSign, onRequestOtp, signerName
         {/* Steps Indicator */}
         <div className="flex border-b border-slate-100">
           {[
-            { key: 'request', label: 'Gửi OTP' },
-            { key: 'otp', label: 'Nhập OTP' },
-            { key: 'sign', label: 'Ký tên' },
+            { key: 'request', label: '1. Nhận OTP' },
+            { key: 'otp', label: '2. Xác nhận' },
+            { key: 'details', label: '3. Khai báo' },
+            { key: 'sign', label: '4. Ký tên' },
           ].map((s, i) => {
-            const steps: Step[] = ['request', 'otp', 'sign', 'done'];
+            const steps: Step[] = ['request', 'otp', 'details', 'sign', 'done'];
             const currentIdx = steps.indexOf(step);
-            const stepIdx = ['request', 'otp', 'sign'].indexOf(s.key as Step);
+            const stepIdx = steps.indexOf(s.key as Step);
             const isDone = currentIdx > stepIdx;
             const isActive = currentIdx === stepIdx;
             return (
-              <div key={s.key} className={`flex-1 py-2 text-center text-xs font-semibold border-b-2 transition-colors ${
-                isDone ? 'border-green-500 text-green-600' :
-                isActive ? 'border-indigo-600 text-indigo-700' :
-                'border-transparent text-slate-400'
+              <div key={s.key} className={`flex-1 py-3 text-center text-[10px] md:text-xs font-semibold border-b-2 transition-colors ${
+                isDone ? 'border-green-500 text-green-600 bg-green-50/50' :
+                isActive ? 'border-indigo-600 text-indigo-700 bg-indigo-50/30' :
+                'border-transparent text-slate-400 opacity-70'
               }`}>
-                {isDone ? '✓ ' : `${i + 1}. `}{s.label}
+                {s.label}
               </div>
             );
           })}
@@ -210,13 +232,61 @@ export function OtpSignModal({ isOpen, onClose, onSign, onRequestOtp, signerName
             </div>
           )}
 
-          {/* STEP 3: Sign Canvas */}
+          {/* STEP 3: Details (Title & Stamp) */}
+          {step === 'details' && (
+            <div className="space-y-5">
+              <div className="text-center mb-6">
+                <p className="font-semibold text-slate-800 text-lg">Thông tin Pháp lý Đại diện</p>
+                <p className="text-sm text-slate-500 mt-1">Cung cấp chức danh và đóng dấu điện tử của bạn</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Chức danh người ký <span className="text-red-500">*</span></label>
+                <input 
+                  type="text" 
+                  value={signerTitle}
+                  onChange={e => setSignerTitle(e.target.value)}
+                  placeholder="Ví dụ: Tổng Giám Đốc, Giám Đốc, Kế Toán Trưởng..."
+                  className="input w-full font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tải lên Con dấu (Mộc đỏ) <span className="text-red-500">*</span></label>
+                <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:bg-slate-50 transition-colors">
+                  {stampImage ? (
+                    <div className="relative inline-block">
+                      <img src={stampImage} alt="Mộc đỏ" className="max-h-28 object-contain" />
+                      <button onClick={() => setStampImage('')} className="absolute -top-3 -right-3 w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center border border-white shadow-sm hover:scale-110 transition">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input type="file" accept="image/png, image/jpeg" onChange={handleStampUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                      <p className="text-sm text-slate-600 font-medium">Bấm hoặc kéo thả file ảnh mộc đỏ</p>
+                      <p className="text-xs text-slate-400 mt-1">Định dạng PNG/JPG trong suốt {'<'} 2MB</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button onClick={() => setStep('otp')} className="btn-ghost border border-slate-200 text-sm">Quay lại</button>
+                <button onClick={handleDetailsConfirm} className="flex-1 btn-primary bg-indigo-600 hover:bg-indigo-700">
+                  Tiếp tục Ký tên →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: Sign Canvas */}
           {step === 'sign' && (
             <div>
               <SignatureCanvas
                 signerName={signerName}
                 onConfirm={handleCanvasConfirm}
-                onCancel={() => setStep('otp')}
+                onCancel={() => setStep('details')}
               />
               {loading && (
                 <div className="flex items-center justify-center gap-2 mt-4 text-sm text-slate-500">

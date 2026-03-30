@@ -16,6 +16,7 @@ export class CreateContractDto {
   terms?: string;
   startDate?: string;
   endDate?: string;
+  rfqId?: string; // MỚI: Dùng để tự động nạp dữ liệu từ Báo Giá
 }
 
 @Injectable()
@@ -44,14 +45,29 @@ export class ContractService {
       throw new Error('Không thể tạo hợp đồng: Người dùng chưa có thông tin công ty');
     }
 
+    // Tự động kết nối Quotation nếu từ RFQ
+    let autoFilledValue = dto.value;
+    let autoFilledTerms = dto.terms || '';
+
+    if (dto.rfqId) {
+      const quotation = await this.prisma.quotation.findFirst({
+        where: { rfqId: dto.rfqId, companyId: dto.supplierId, status: 'ACCEPTED' },
+        orderBy: { createdAt: 'desc' }
+      });
+      if (quotation) {
+        autoFilledValue = quotation.price;
+        autoFilledTerms = `Báo giá tham chiếu: ${quotation.id}.\n${quotation.message || ''}\n${dto.terms || ''}`.trim();
+      }
+    }
+
     return this.prisma.contract.create({
       data: {
         title: dto.title,
         buyerId: user.companyId,
         supplierId: dto.supplierId,
-        value: dto.value,
+        value: autoFilledValue,
         currency: dto.currency || 'VND',
-        terms: dto.terms,
+        terms: autoFilledTerms,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
         status: 'DRAFT',
@@ -132,7 +148,7 @@ export class ContractService {
     };
   }
 
-  async sign(id: string, userId: string, otp: string, signatureImage?: string) {
+  async sign(id: string, userId: string, otp: string, signatureImage?: string, stampUrl?: string, signerTitle?: string) {
     const key = `${id}_${userId}`;
     const stored = otpStore.get(key);
 
@@ -144,12 +160,15 @@ export class ContractService {
     }
     if (stored.otp !== otp) throw new BadRequestException('Mã OTP không chính xác.');
 
+    // Cần cả chức danh pháp lý để đủ điều kiện
+    if (!signerTitle) throw new BadRequestException('Vui lòng cung cấp chức danh đại diện pháp luật khi ký.');
+
     // Xóa OTP sau khi dùng
     otpStore.delete(key);
 
-    // Lưu chữ ký
+    // Lưu chữ ký và con dấu pháp lý
     await this.prisma.contractSignature.create({
-      data: { contractId: id, userId, signatureUrl: signatureImage },
+      data: { contractId: id, userId, signatureUrl: signatureImage, stampUrl, signerTitle },
     });
     
     // Kiểm tra nếu đủ 2 bên đã ký

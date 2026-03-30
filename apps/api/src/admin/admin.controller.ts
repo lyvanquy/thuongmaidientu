@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Query, UseGuards, Body } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { PrismaService } from '../prisma/prisma.service';
@@ -96,11 +96,14 @@ export class AdminController {
   }
 
   @Patch('contracts/:id/approve')
-  @ApiOperation({ summary: 'Admin phê duyệt hợp đồng' })
-  async approveContract(@Param('id') id: string) {
+  @ApiOperation({ summary: 'Admin phê duyệt hợp đồng, có thể sửa đổi nội dung' })
+  async approveContract(@Param('id') id: string, @Body() body: { terms?: string }) {
     return this.prisma.contract.update({
       where: { id },
-      data: { status: 'APPROVED' },
+      data: { 
+        status: 'APPROVED',
+        ...(body.terms !== undefined && { terms: body.terms })
+      },
     });
   }
 

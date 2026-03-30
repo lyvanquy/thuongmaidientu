@@ -1,9 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ShoppingBag, Loader2, Package, Truck, CheckCircle, XCircle, Clock, ChevronRight, Home } from 'lucide-react';
 
@@ -23,6 +23,17 @@ export default function OrdersPage() {
   const { user } = useAuthStore();
   const router = useRouter();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const searchParams = useSearchParams();
+  const paymentStatus = searchParams.get('payment_status');
+  const paymentCod = searchParams.get('payment');
+  const [showBanner, setShowBanner] = useState(true);
+
+  useEffect(() => {
+    if (paymentStatus === 'success' || paymentCod === 'cod_success') {
+      const t = setTimeout(() => setShowBanner(false), 6000);
+      return () => clearTimeout(t);
+    }
+  }, [paymentStatus, paymentCod]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-orders'],
@@ -47,6 +58,31 @@ export default function OrdersPage() {
             <p className="text-slate-500 text-sm">Theo dõi trạng thái tất cả đơn hàng của bạn</p>
           </div>
         </div>
+
+        {/* Thanh toán thành công */}
+        {showBanner && (paymentStatus === 'success' || paymentCod === 'cod_success') && (
+          <div className="mb-8 p-4 bg-green-50 border border-green-200 rounded-2xl flex items-center gap-4 text-green-800 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xl">
+              🎉
+            </div>
+            <div className="flex-1">
+              <p className="font-extrabold text-base">Thanh toán tự động thành công!</p>
+              <p className="text-sm text-green-700 opacity-90">Hệ thống đã ghi nhận. Kiểm tra trạng thái đơn hàng mới nhất bên dưới nhé.</p>
+            </div>
+            <button onClick={() => setShowBanner(false)} className="text-green-500 hover:text-green-700 font-bold text-xl leading-none">×</button>
+          </div>
+        )}
+        {paymentStatus === 'failed' && (
+          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-4 text-red-800">
+            <div className="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xl">
+              ⚠️
+            </div>
+            <div>
+              <p className="font-extrabold text-base">Thanh toán thất bại!</p>
+              <p className="text-sm text-red-700 opacity-90">Giao dịch bị từ chối. Vui lòng kiểm tra và thử lại.</p>
+            </div>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary-600" size={32} /></div>

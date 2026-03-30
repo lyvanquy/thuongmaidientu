@@ -105,6 +105,11 @@ export const contractApi = {
   complete: (id: string) => api.post(`/contracts/${id}/complete`),
 };
 
+// Payments
+export const paymentApi = {
+  createUrl: (orderId: string, method: string) => api.post(`/payments/${orderId}/create-url`, { method }),
+};
+
 // Chat
 export const chatApi = {
   create: (d: any) => api.post('/chats', d),
@@ -149,6 +154,6 @@ export const adminApi = {
   approveProduct: (id: string) => api.patch(`/admin/products/${id}/approve`),
   rejectProduct: (id: string) => api.patch(`/admin/products/${id}/reject`),
   contracts: (params?: any) => api.get('/admin/contracts', { params }),
-  approveContract: (id: string) => api.patch(`/admin/contracts/${id}/approve`),
+  approveContract: (id: string, body?: { terms?: string }) => api.patch(`/admin/contracts/${id}/approve`, body),
   rejectContract: (id: string) => api.patch(`/admin/contracts/${id}/reject`),
 };

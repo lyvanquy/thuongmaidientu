@@ -1,15 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { PaymentMethod, PaymentStatus, OrderStatus } from '@prisma/client';
+import { PaymentMethod } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
-import { OrderService } from '../order/order.service';
 
 @Injectable()
 export class PaymentService {
   constructor(
     private prisma: PrismaService,
     private notificationService: NotificationService,
-    @Inject(forwardRef(() => OrderService)) private orderService: OrderService
   ) {}
 
   async createPaymentUrl(orderId: string, method: PaymentMethod = 'BANK_TRANSFER') {
@@ -29,21 +27,29 @@ export class PaymentService {
     });
 
     if (method === 'CASH_ON_DELIVERY') {
-      // COD means just success right away and update order status
-      await this.prisma.order.update({ where: { id: orderId }, data: { status: 'CONFIRMED' }});
-      await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'SUCCESS' }});
-      return { success: true, redirectUrl: `/dashboard/orders/${orderId}?payment=cod_success` };
+      // COD means just success right away and update order status to PAID
+      await this.prisma.order.update({ where: { id: orderId }, data: { status: 'PAID' }});
+      await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'SUCCESS', paidAt: new Date() }});
+      this.notificationService.create(
+        order.buyerId,
+        'Thanh toán thành công (COD)',
+        `Đơn hàng #${order.orderNumber} đã được xác nhận thanh toán COD.`,
+        'ORDER',
+        `/orders?payment=cod_success`
+      );
+      return { success: true, redirectUrl: `/orders?payment=cod_success` };
     }
 
-    // Mock URL for Sandbox Payment Gateway
-    const mockUrl = `${process.env.API_URL || 'http://localhost:3001/api'}/payments/webhook?transactionId=${payment.transactionId}&vnp_ResponseCode=00`;
+    // Mock URL cho Cổng Thanh Toán VNPay Sandbox (Frontend UI)
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const mockUrl = `${frontendUrl}/checkout/gateway?transactionId=${payment.transactionId}&amount=${order.total}`;
     
     return { 
       success: true, 
       paymentId: payment.id, 
       method,
       amount: order.total,
-      redirectUrl: mockUrl // In reality, this redirects to VNPay Gateway
+      redirectUrl: mockUrl // Chuyển hướng người dùng qua giao diện cổng thanh toán
     };
   }
 
@@ -56,15 +62,24 @@ export class PaymentService {
     if (payment.status !== 'PENDING') return { message: 'Already processed' };
 
     if (responseCode === '00') {
-      // Success
+      // Success -> Ghi nhận giao dịch thành công (PAID)
       await this.prisma.$transaction([
-        this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'SUCCESS' } }),
-        this.prisma.order.update({ where: { id: payment.orderId }, data: { status: 'CONFIRMED' } })
+        this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'SUCCESS', paidAt: new Date() } }),
+        this.prisma.order.update({ where: { id: payment.orderId }, data: { status: 'PAID' } })
       ]);
       
-      const p = await this.prisma.payment.findUnique({ where: { id: payment.id }, include: { order: true } });
-      if (p && p.order) {
-        this.notificationService.create(p.order.buyerId, 'Thanh toán thành công', `Đơn hàng #${p.order.orderNumber} đã được thanh toán.`, 'ORDER', `/dashboard/orders/${p.order.id}`);
+      const order = await this.prisma.order.findUnique({ 
+        where: { id: payment.orderId }, 
+        select: { id: true, orderNumber: true, buyerId: true },
+      });
+      if (order) {
+        this.notificationService.create(
+          order.buyerId,
+          'Thanh toán tự động thành công!',
+          `Đơn hàng #${order.orderNumber} đã được xác nhận thanh toán thành công.`,
+          'PAYMENT',
+          `/orders?payment_status=success`
+        );
       }
       
       return { code: '00', message: 'Confirm Success' };

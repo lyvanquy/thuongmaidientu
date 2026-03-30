@@ -75,6 +75,7 @@ export default function ContractDetailPage() {
     endDate: '',
   });
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
 
   const fetchContract = async () => {
     if (!id) return;
@@ -113,6 +114,9 @@ export default function ContractDetailPage() {
   const amISigned  = contract.signatures?.some((s: any) => s.userId === user?.id);
   const supplierSig = contract.signatures?.find((s: any) => s.user?.companyId === contract.supplierId);
   const buyerSig    = contract.signatures?.find((s: any) => s.user?.companyId === contract.buyerId);
+  
+  const canSupplierSign = !amISigned && contract.status === 'APPROVED' && isSupplier && !supplierSig;
+  const canBuyerSign    = !amISigned && contract.status === 'APPROVED' && isBuyer    && !buyerSig;
 
   const handleSave = async () => {
     setSaving(true);
@@ -168,12 +172,12 @@ export default function ContractDetailPage() {
     return res.data;
   };
 
-  const handleSign = async (otp: string, signatureImage: string) => {
-    await api.post(`/contracts/${id}/sign`, { otp, signatureImage });
+  const handleSign = async (otp: string, signatureImage: string, stampUrl: string, signerTitle: string) => {
+    await api.post(`/contracts/${id}/sign`, { otp, signatureImage, stampUrl, signerTitle });
     await fetchContract();
   };
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => setShowPrintPreview(true);
 
   // Tạo nội dung điều khoản từ form data
   const buildTermsText = () => {
@@ -188,7 +192,6 @@ export default function ContractDetailPage() {
 
   return (
     <>
-      {/* Print CSS */}
       <style global jsx>{`
         @media print {
           .no-print { display: none !important; }
@@ -197,12 +200,25 @@ export default function ContractDetailPage() {
         }
       `}</style>
 
-      <div className="bg-slate-100 min-h-screen py-6">
-        <div className="max-w-5xl mx-auto px-4">
+      <div className={`bg-slate-100 min-h-screen py-6 ${showPrintPreview ? 'fixed inset-0 z-50 !bg-slate-900/90 overflow-auto flex flex-col backdrop-blur-md' : ''}`}>
+        
+        {/* Print Preview Floating Toolbar */}
+        {showPrintPreview && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 flex items-center gap-4 z-[70] bg-white/10 backdrop-blur-xl px-5 py-3 rounded-full shadow-2xl border border-white/20">
+            <span className="text-white/80 text-sm font-medium mr-4">Chế độ Xem Trước (A4)</span>
+            <button onClick={() => setShowPrintPreview(false)} className="px-4 py-2 rounded-full text-white text-sm font-semibold hover:bg-white/20 transition">Đóng</button>
+            <button onClick={() => window.print()} className="px-5 py-2 rounded-full bg-primary-600 hover:bg-primary-500 text-white text-sm font-bold shadow-xl flex items-center gap-2 transition">
+              <Printer size={16} /> Bắt đầu In / Lưu PDF
+            </button>
+          </div>
+        )}
+
+        <div className={`max-w-5xl mx-auto px-4 ${showPrintPreview ? 'w-full mt-24 pb-24 drop-shadow-2xl scale-[0.85] origin-top' : ''}`}>
 
           {/* Topbar — no-print */}
-          <div className="no-print flex flex-wrap items-center justify-between gap-3 mb-6">
-            <Link href="/contracts" className="text-slate-500 hover:text-primary-600 font-medium flex items-center gap-1">
+          {!showPrintPreview && (
+            <div className="no-print flex flex-wrap items-center justify-between gap-3 mb-6">
+              <Link href="/contracts" className="text-slate-500 hover:text-primary-600 font-medium flex items-center gap-1">
               <ArrowLeft size={16} /> Quay lại danh sách
             </Link>
             <div className="flex items-center gap-2 flex-wrap">
@@ -254,6 +270,7 @@ export default function ContractDetailPage() {
               )}
             </div>
           </div>
+          )}
 
           <div className="flex gap-6">
             {/* Left: Timeline (no-print) */}
@@ -425,19 +442,36 @@ export default function ContractDetailPage() {
                   <div className="grid grid-cols-2 gap-8 mt-16 pt-10 border-t-2 border-slate-200 text-center">
                     <div>
                       <p className="font-black uppercase text-sm tracking-wider mb-1">ĐẠI DIỆN BÊN A (BÊN BÁN)</p>
-                      <p className="text-xs text-slate-500 italic mb-8">(Ký tên, đóng dấu)</p>
-                      <div className="min-h-24 border-b border-dashed border-slate-300 flex items-end justify-center pb-2">
+                      <p className="text-xs text-slate-500 italic mb-4">(Ký tên, đóng dấu)</p>
+                      <div 
+                        onClick={() => canSupplierSign && setShowOtpModal(true)}
+                        className={`min-h-32 border-b border-dashed flex flex-col justify-end pb-2 transition-all ${
+                          canSupplierSign 
+                            ? 'cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-400 border-2 border-indigo-200 rounded-xl' 
+                            : 'border-slate-300'
+                        }`}
+                      >
                         {supplierSig ? (
-                          <div className="flex flex-col items-center gap-1">
-                            {supplierSig.signatureUrl?.startsWith('data:image') && (
-                              <img src={supplierSig.signatureUrl} alt="Chữ ký" className="max-h-20 max-w-full object-contain" />
-                            )}
-                            <span className="text-xs text-green-600 font-bold flex items-center gap-1">
-                              <ShieldCheck size={12} /> Đã ký điện tử {new Date(supplierSig.signedAt).toLocaleDateString('vi-VN')}
+                          <div className="flex flex-col items-center w-full">
+                            <span className="font-bold text-sm text-slate-800 mb-1 leading-tight">{supplierSig.signerTitle}</span>
+                            <div className="relative w-full max-w-[200px] h-28 flex items-center justify-center mx-auto mb-2">
+                              {supplierSig.signatureUrl && (
+                                <img src={supplierSig.signatureUrl} alt="Chữ ký" className="absolute z-20 max-h-24 max-w-full object-contain mix-blend-multiply opacity-95" />
+                              )}
+                              {supplierSig.stampUrl && (
+                                <img src={supplierSig.stampUrl} alt="Mộc đỏ" className="absolute z-10 max-h-28 -ml-8 mt-2 opacity-90 mix-blend-multiply rotate-[-3deg]" style={{ left: '50%' }} />
+                              )}
+                            </div>
+                            <span className="font-extrabold uppercase text-slate-900 border-t border-slate-200 pt-1 inline-block min-w-32">{supplierSig.user?.name}</span>
+                            <span className="text-[10px] text-green-600 font-bold flex items-center gap-1 mt-1 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
+                              <ShieldCheck size={10} /> Đã xác thực điện tử
                             </span>
                           </div>
                         ) : (
-                          <span className="text-slate-300 text-sm italic">Chưa ký</span>
+                          <div className="flex flex-col items-center pb-8">
+                            <span className="text-slate-300 text-sm italic">Chưa ký</span>
+                            {canSupplierSign && <span className="text-[10px] text-indigo-600 font-bold mt-2 animate-pulse bg-indigo-50 px-2 py-1 rounded-full border border-indigo-200">Bấm vào đây để Ký & Đóng dấu</span>}
+                          </div>
                         )}
                       </div>
                       <p className="text-sm font-semibold mt-2">{contract.supplier?.name}</p>
@@ -445,19 +479,36 @@ export default function ContractDetailPage() {
 
                     <div>
                       <p className="font-black uppercase text-sm tracking-wider mb-1">ĐẠI DIỆN BÊN B (BÊN MUA)</p>
-                      <p className="text-xs text-slate-500 italic mb-8">(Ký tên, đóng dấu)</p>
-                      <div className="min-h-24 border-b border-dashed border-slate-300 flex items-end justify-center pb-2">
+                      <p className="text-xs text-slate-500 italic mb-4">(Ký tên, đóng dấu)</p>
+                      <div 
+                        onClick={() => canBuyerSign && setShowOtpModal(true)}
+                        className={`min-h-32 border-b border-dashed flex flex-col justify-end pb-2 transition-all ${
+                          canBuyerSign 
+                            ? 'cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-400 border-2 border-indigo-200 rounded-xl' 
+                            : 'border-slate-300'
+                        }`}
+                      >
                         {buyerSig ? (
-                          <div className="flex flex-col items-center gap-1">
-                            {buyerSig.signatureUrl?.startsWith('data:image') && (
-                              <img src={buyerSig.signatureUrl} alt="Chữ ký" className="max-h-20 max-w-full object-contain" />
-                            )}
-                            <span className="text-xs text-green-600 font-bold flex items-center gap-1">
-                              <ShieldCheck size={12} /> Đã ký điện tử {new Date(buyerSig.signedAt).toLocaleDateString('vi-VN')}
+                          <div className="flex flex-col items-center w-full">
+                            <span className="font-bold text-sm text-slate-800 mb-1 leading-tight">{buyerSig.signerTitle}</span>
+                            <div className="relative w-full max-w-[200px] h-28 flex items-center justify-center mx-auto mb-2">
+                              {buyerSig.signatureUrl && (
+                                <img src={buyerSig.signatureUrl} alt="Chữ ký" className="absolute z-20 max-h-24 max-w-full object-contain mix-blend-multiply opacity-95" />
+                              )}
+                              {buyerSig.stampUrl && (
+                                <img src={buyerSig.stampUrl} alt="Mộc đỏ" className="absolute z-10 max-h-28 -ml-8 mt-2 opacity-90 mix-blend-multiply rotate-[-3deg]" style={{ left: '50%' }} />
+                              )}
+                            </div>
+                            <span className="font-extrabold uppercase text-slate-900 border-t border-slate-200 pt-1 inline-block min-w-32">{buyerSig.user?.name}</span>
+                            <span className="text-[10px] text-green-600 font-bold flex items-center gap-1 mt-1 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
+                              <ShieldCheck size={10} /> Đã xác thực điện tử
                             </span>
                           </div>
                         ) : (
-                          <span className="text-slate-300 text-sm italic">Chưa ký</span>
+                          <div className="flex flex-col items-center pb-8">
+                            <span className="text-slate-300 text-sm italic">Chưa ký</span>
+                            {canBuyerSign && <span className="text-[10px] text-indigo-600 font-bold mt-2 animate-pulse bg-indigo-50 px-2 py-1 rounded-full border border-indigo-200">Bấm vào đây để Ký & Đóng dấu</span>}
+                          </div>
                         )}
                       </div>
                       <p className="text-sm font-semibold mt-2">{contract.buyer?.name}</p>

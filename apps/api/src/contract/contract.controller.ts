@@ -38,13 +38,13 @@ export class ContractController {
   submit(@Param('id') id: string) { return this.service.submit(id); }
 
   @Post(':id/sign')
-  @ApiOperation({ summary: 'Ký hợp đồng với OTP xác nhận (SIGNED khi đủ 2 bên)' })
+  @ApiOperation({ summary: 'Ký hợp đồng với OTP xác nhận, Chữ Ký và Mộc Đỏ (SIGNED khi đủ 2 bên)' })
   sign(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
-    @Body() body: { otp: string; signatureImage?: string },
+    @Body() body: { otp: string; signatureImage?: string; stampUrl?: string; signerTitle?: string },
   ) {
-    return this.service.sign(id, userId, body.otp, body.signatureImage);
+    return this.service.sign(id, userId, body.otp, body.signatureImage, body.stampUrl, body.signerTitle);
   }
 
   @Post(':id/request-otp')

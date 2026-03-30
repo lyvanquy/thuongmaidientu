@@ -348,11 +348,13 @@ model Contract {
 model ContractSignature {
   id          String   @id @default(uuid())
   contractId  String
-  userId      String
-  signedAt    DateTime @default(now())
-  signatureUrl String? // URL to signature image/file
+  userId       String
+  signedAt     DateTime @default(now())
+  signatureUrl String?  // URL to signature image/file
+  stampUrl     String?  // MỚI: URL to company red stamp/seal
+  signerTitle  String?  // MỚI: Giám đốc, Kế toán trưởng...
 
-  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
   user        User     @relation(fields: [userId], references: [id])
 }
 

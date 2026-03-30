@@ -3,7 +3,7 @@ import { useCartStore } from '@/store/cart.store';
 import { useAuthStore } from '@/store/auth.store';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, paymentApi } from '@/lib/api';
 import { Loader2, Trash2, MapPin, CreditCard, ShieldCheck, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
@@ -47,8 +47,13 @@ export default function CheckoutPage() {
       });
       const order = orderRes.data;
 
-      // 2. Lấy URL Thanh toán
-      const paymentRes = await api.post(`/payments/${order.id}/create-url`, { method: paymentMethod });
+      // 2. Lấy URL Thanh toán (map UI value -> Prisma Enum)
+      const methodMap: Record<string, string> = {
+        'COD': 'CASH_ON_DELIVERY',
+        'VNPAY': 'VNPAY',
+        'BANK_TRANSFER': 'BANK_TRANSFER',
+      };
+      const paymentRes = await paymentApi.createUrl(order.id, methodMap[paymentMethod] || 'CASH_ON_DELIVERY');
       
       clearCart();
 

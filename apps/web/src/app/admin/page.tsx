@@ -8,6 +8,7 @@ import {
   Users, Building2, Package, ShoppingBag, FileText, ClipboardList,
   CheckCircle, XCircle, AlertTriangle, TrendingUp, Loader2, Shield
 } from 'lucide-react';
+import { AdminContractDialog } from '@/components/contract/admin-contract-dialog';
 import Link from 'next/link';
 
 type AdminTab = 'overview' | 'companies' | 'products' | 'users' | 'contracts';
@@ -17,6 +18,8 @@ export default function AdminPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const [tab, setTab] = useState<AdminTab>('overview');
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
+  const [showContractDialog, setShowContractDialog] = useState(false);
 
   if (user && user.role !== 'ADMIN') {
     router.replace('/');
@@ -69,10 +72,15 @@ export default function AdminPage() {
   });
 
   const authContractMutation = useMutation({
-    mutationFn: ({ id, action }: { id: string, action: 'approve' | 'reject' }) => 
-      action === 'approve' ? adminApi.approveContract(id) : adminApi.rejectContract(id),
+    mutationFn: ({ id, action, terms }: { id: string, action: 'approve' | 'reject', terms?: string }) => 
+      action === 'approve' ? adminApi.approveContract(id, { terms }) : adminApi.rejectContract(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-contracts'] }),
   });
+
+  const handleContractDecision = async (action: 'approve' | 'reject', terms?: string) => {
+    if (!selectedContractId) return;
+    await authContractMutation.mutateAsync({ id: selectedContractId, action, terms });
+  };
 
   const tabs: { key: AdminTab; label: string; icon: any }[] = [
     { key: 'overview', label: 'Tổng quan', icon: TrendingUp },
@@ -378,26 +386,25 @@ export default function AdminPage() {
                           </td>
                           <td className="px-5 py-3 text-right">
                             {c.status === 'PENDING' ? (
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  onClick={() => authContractMutation.mutate({ id: c.id, action: 'approve' })}
-                                  disabled={authContractMutation.isPending}
-                                  className="p-1.5 text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition disabled:opacity-50"
-                                  title="Phê duyệt hợp đồng"
-                                >
-                                  <CheckCircle size={16} />
-                                </button>
-                                <button
-                                  onClick={() => authContractMutation.mutate({ id: c.id, action: 'reject' })}
-                                  disabled={authContractMutation.isPending}
-                                  className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition disabled:opacity-50"
-                                  title="Từ chối hợp đồng"
-                                >
-                                  <XCircle size={16} />
-                                </button>
-                              </div>
+                              <button
+                                onClick={() => {
+                                  setSelectedContractId(c.id);
+                                  setShowContractDialog(true);
+                                }}
+                                className="px-3 py-1.5 text-xs font-bold text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100 transition shadow-sm border border-primary-200"
+                              >
+                                Xem & Duyệt
+                              </button>
                             ) : (
-                              <Link href={`/contracts/${c.id}`} className="text-xs text-primary-600 hover:underline">Chi tiết</Link>
+                              <button
+                                onClick={() => {
+                                  setSelectedContractId(c.id);
+                                  setShowContractDialog(true);
+                                }}
+                                className="text-xs text-slate-500 hover:text-primary-600 underline font-medium"
+                              >
+                                Xem văn bản
+                              </button>
                             )}
                           </td>
                         </tr>
@@ -414,6 +421,13 @@ export default function AdminPage() {
           </main>
         </div>
       </div>
+
+      <AdminContractDialog
+        isOpen={showContractDialog}
+        onClose={() => setShowContractDialog(false)}
+        contractId={selectedContractId}
+        onDecide={handleContractDecision}
+      />
     </div>
   );
 }
