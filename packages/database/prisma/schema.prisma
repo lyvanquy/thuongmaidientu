@@ -1,0 +1,614 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================
+// AUTH & USER
+// =====================
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String
+  role          Role     @default(BUYER)
+  name          String?
+  phone         String?
+  avatar        String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  companyId     String?
+  company       Company? @relation(fields: [companyId], references: [id])
+
+  refreshTokens RefreshToken[]
+  rfqs          RFQ[]           @relation("BuyerRFQ")
+  messages      Message[]
+  notifications Notification[]
+  favorites     Favorite[]
+  auditLogs     AuditLog[]
+  chatParticipants ChatParticipant[]
+  contractSignatures ContractSignature[]
+  sentQuotations Quotation[] @relation("SupplierQuotation")
+}
+
+enum Role {
+  ADMIN
+  SUPPLIER
+  BUYER
+  STAFF
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// =====================
+// COMPANY
+// =====================
+
+model Company {
+  id               String            @id @default(uuid())
+  name             String
+  slug             String            @unique
+  description      String?
+  logo             String?
+  banner           String?
+  website          String?
+  phone            String?
+  email            String?
+  address          String?
+  province         String?
+  country          String            @default("Vietnam")
+  yearFounded      Int?
+  employeeCount    String?           // "1-10", "11-50", "51-200", "200+"
+  businessType     String?           // "Manufacturer", "Trader", "Agent"
+  verificationStatus VerificationStatus @default(PENDING)
+  isFeatured       Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  users            User[]
+  products         Product[]
+  verification     CompanyVerification?
+  buyerContracts   Contract[]        @relation("BuyerContract")
+  supplierContracts Contract[]       @relation("SupplierContract")
+  quotations       Quotation[]
+  industries       CompanyIndustry[]
+  media            CompanyMedia[]
+  favorites        Favorite[]        @relation("FavoriteCompany")
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  FEATURED
+}
+
+model CompanyVerification {
+  id          String   @id @default(uuid())
+  companyId   String   @unique
+  documents   String[] // URLs to uploaded documents
+  notes       String?
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model CompanyIndustry {
+  id         String   @id @default(uuid())
+  companyId  String
+  categoryId String
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  @@unique([companyId, categoryId])
+}
+
+model CompanyMedia {
+  id        String    @id @default(uuid())
+  companyId String
+  type      MediaType
+  url       String
+  title     String?
+  createdAt DateTime  @default(now())
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  CERTIFICATE
+  DOCUMENT
+}
+
+// =====================
+// CATEGORY
+// =====================
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  description String?
+  icon        String?
+  image       String?
+  parentId    String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  products    Product[]
+  companyIndustries CompanyIndustry[]
+}
+
+// =====================
+// PRODUCT
+// =====================
+
+model Product {
+  id           String      @id @default(uuid())
+  name         String
+  slug         String      @unique
+  description  String?
+  price        Float
+  priceMax     Float?      // Giá đàm phán tối đa (B2B)
+  moq          Int?        // Minimum Order Quantity
+  unit         String?     // "cái", "kg", "thùng"
+  region       String?
+  province     String?
+  type         ProductType @default(B2C)
+  status       ProductStatus @default(PENDING)
+  isFeatured   Boolean     @default(false)
+  viewCount    Int         @default(0)
+  companyId    String
+  categoryId   String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  company      Company     @relation(fields: [companyId], references: [id])
+  category     Category    @relation(fields: [categoryId], references: [id])
+  images       ProductImage[]
+  attributes   ProductAttribute[]
+  orderItems   OrderItem[]
+  favorites    Favorite[]  @relation("FavoriteProduct")
+}
+
+model ProductImage {
+  id        String  @id @default(uuid())
+  url       String
+  alt       String?
+  isPrimary Boolean @default(false)
+  sortOrder Int     @default(0)
+  productId String
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductAttribute {
+  id        String  @id @default(uuid())
+  productId String
+  key       String
+  value     String
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+enum ProductType {
+  B2B
+  B2C
+  BOTH
+}
+
+enum ProductStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DRAFT
+}
+
+// =====================
+// FAVORITE / WISHLIST
+// =====================
+
+model Favorite {
+  id          String   @id @default(uuid())
+  userId      String
+  productId   String?
+  companyId   String?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product     Product? @relation("FavoriteProduct", fields: [productId], references: [id], onDelete: Cascade)
+  company     Company? @relation("FavoriteCompany", fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@unique([userId, companyId])
+}
+
+// =====================
+// RFQ (Request for Quotation)
+// =====================
+
+model RFQ {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  buyerId     String
+  targetCompanyId String?
+  status      RFQStatus @default(OPEN)
+  deadline    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  buyer       User      @relation("BuyerRFQ", fields: [buyerId], references: [id])
+  items       RFQItem[]
+  quotations  Quotation[]
+  chat        Chat?
+}
+
+model RFQItem {
+  id          String  @id @default(uuid())
+  rfqId       String
+  productId   String?
+  productName String
+  quantity    Int
+  unit        String?
+  notes       String?
+
+  rfq         RFQ     @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+}
+
+enum RFQStatus {
+  OPEN
+  RESPONDED
+  NEGOTIATING
+  CLOSED
+  CANCELLED
+}
+
+// =====================
+// QUOTATION
+// =====================
+
+model Quotation {
+  id          String          @id @default(uuid())
+  rfqId       String
+  supplierId  String
+  companyId   String
+  price       Float
+  currency    String          @default("VND")
+  validUntil  DateTime?
+  message     String?
+  attachments String[]
+  status      QuotationStatus @default(PENDING)
+  version     Int             @default(1)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  rfq         RFQ             @relation(fields: [rfqId], references: [id])
+  supplier    User            @relation("SupplierQuotation", fields: [supplierId], references: [id])
+  company     Company         @relation(fields: [companyId], references: [id])
+}
+
+enum QuotationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COUNTERED
+  EXPIRED
+}
+
+// =====================
+// CONTRACT
+// =====================
+
+model Contract {
+  id              String         @id @default(uuid())
+  title           String
+  contractNumber  String         @unique @default(cuid())
+  buyerId         String
+  supplierId      String
+  value           Float
+  currency        String         @default("VND")
+  terms           String?        // Contract terms / content
+  startDate       DateTime?
+  endDate         DateTime?
+  status          ContractStatus @default(DRAFT)
+  attachments     String[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  buyer           Company        @relation("BuyerContract", fields: [buyerId], references: [id])
+  supplier        Company        @relation("SupplierContract", fields: [supplierId], references: [id])
+  signatures      ContractSignature[]
+  orders          Order[]
+  chat            Chat?
+}
+
+model ContractSignature {
+  id          String   @id @default(uuid())
+  contractId  String
+  userId      String
+  signedAt    DateTime @default(now())
+  signatureUrl String? // URL to signature image/file
+
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+enum ContractStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  SIGNED
+  COMPLETED
+  CANCELLED
+}
+
+// =====================
+// CHAT
+// =====================
+
+model Chat {
+  id         String   @id @default(uuid())
+  title      String?
+  rfqId      String?  @unique
+  contractId String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  rfq        RFQ?      @relation(fields: [rfqId], references: [id])
+  contract   Contract? @relation(fields: [contractId], references: [id])
+  participants ChatParticipant[]
+  messages   Message[]
+}
+
+model ChatParticipant {
+  id        String   @id @default(uuid())
+  chatId    String
+  userId    String
+  joinedAt  DateTime @default(now())
+
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([chatId, userId])
+}
+
+model Message {
+  id          String      @id @default(uuid())
+  chatId      String
+  senderId    String
+  content     String
+  type        MessageType @default(TEXT)
+  attachments String[]
+  isRead      Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+
+  chat        Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender      User        @relation(fields: [senderId], references: [id])
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+}
+
+// =====================
+// ORDER (B2C / B2B)
+// =====================
+
+model Order {
+  id          String      @id @default(uuid())
+  orderNumber String      @unique @default(cuid())
+  contractId  String?
+  buyerId     String
+  total       Float
+  subTotal    Float
+  shippingFee Float       @default(0)
+  discount    Float       @default(0)
+  status      OrderStatus @default(PENDING)
+  address     String?
+  note        String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  contract    Contract?   @relation(fields: [contractId], references: [id])
+  items       OrderItem[]
+  payments    Payment[]
+  shipment    Shipment?
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  total     Float
+
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+// =====================
+// PAYMENT
+// =====================
+
+model Payment {
+  id            String        @id @default(uuid())
+  orderId       String
+  amount        Float
+  method        PaymentMethod @default(BANK_TRANSFER)
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  metadata      Json?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+
+  order         Order         @relation(fields: [orderId], references: [id])
+  webhookLogs   WebhookLog[]
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  VNPAY
+  CASH_ON_DELIVERY
+  WALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+// =====================
+// SHIPMENT
+// =====================
+
+model Shipment {
+  id           String         @id @default(uuid())
+  orderId      String         @unique
+  carrier      String?
+  trackingCode String?
+  status       ShipmentStatus @default(PENDING)
+  estimatedAt  DateTime?
+  deliveredAt  DateTime?
+  createdAt    DateTime       @default(now())
+
+  order        Order          @relation(fields: [orderId], references: [id])
+}
+
+enum ShipmentStatus {
+  PENDING
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+}
+
+// =====================
+// NOTIFICATION
+// =====================
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  title     String
+  body      String?
+  type      NotificationType @default(INFO)
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  RFQ
+  QUOTATION
+  CONTRACT
+  ORDER
+  PAYMENT
+  CHAT
+}
+
+// =====================
+// ADS & FEATURED
+// =====================
+
+model Ad {
+  id        String   @id @default(uuid())
+  title     String
+  image     String
+  link      String
+  position  String   // "hero", "sidebar", "category"
+  isActive  Boolean  @default(true)
+  startAt   DateTime
+  endAt     DateTime
+  createdAt DateTime @default(now())
+}
+
+model FeaturedListing {
+  id        String   @id @default(uuid())
+  companyId String?
+  productId String?
+  type      String   // "company" | "product"
+  startAt   DateTime
+  endAt     DateTime
+  createdAt DateTime @default(now())
+}
+
+// =====================
+// WEBHOOK LOGS
+// =====================
+
+model WebhookLog {
+  id        String   @id @default(uuid())
+  event     String
+  source    String
+  payload   Json
+  status    String   @default("received")
+  paymentId String?
+  createdAt DateTime @default(now())
+
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+}
+
+// =====================
+// AUDIT LOG
+// =====================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  entity     String
+  entityId   String
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation(fields: [userId], references: [id])
+}

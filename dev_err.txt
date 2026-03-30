@@ -1,0 +1,16 @@
+
+> trademart@0.0.1 dev
+> turbo run dev
+
+ΓÇó turbo 2.8.21
+turbo_json_parse_error
+
+  x Failed to parse turbo.json.
+  `->   x Found an unknown key `globalDotEnv`.
+         ,-[turbo.json:3:3]
+       2 |   "$schema": "https://turbo.build/schema.json",
+       3 |   "globalDotEnv": [".env"],
+         :   ^^^^^^^^^^^^^^
+       4 |   "tasks": {
+         `----
+

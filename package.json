@@ -1,0 +1,26 @@
+{
+  "name": "trademart",
+  "version": "0.0.1",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "db:generate": "turbo run db:generate --filter=@trademart/database",
+    "db:migrate": "turbo run db:migrate --filter=@trademart/database",
+    "db:push": "turbo run db:push --filter=@trademart/database",
+    "db:seed": "turbo run db:seed --filter=@trademart/database",
+    "db:studio": "turbo run db:studio --filter=@trademart/database"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3"
+  },
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
