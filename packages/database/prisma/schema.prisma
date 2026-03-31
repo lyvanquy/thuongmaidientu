@@ -35,6 +35,7 @@ model User {
   chatParticipants ChatParticipant[]
   contractSignatures ContractSignature[]
   sentQuotations Quotation[] @relation("SupplierQuotation")
+  otps           Otp[]
 }
 
 enum Role {
@@ -52,6 +53,18 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Otp {
+  id         String   @id @default(uuid())
+  code       String
+  userId     String
+  contractId String?
+  expiresAt  DateTime
+  isUsed     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // =====================

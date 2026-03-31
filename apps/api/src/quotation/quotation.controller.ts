@@ -37,7 +37,7 @@ export class QuotationController {
 
   @Patch(':id/reject')
   @ApiOperation({ summary: 'Buyer từ chối báo giá' })
-  reject(@Param('id') id: string) {
-    return this.service.reject(id);
+  reject(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.service.reject(id, userId);
   }
 }

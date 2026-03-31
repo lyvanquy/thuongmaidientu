@@ -33,6 +33,10 @@ export default function OrdersPage() {
       const t = setTimeout(() => setShowBanner(false), 6000);
       return () => clearTimeout(t);
     }
+    if (paymentStatus === 'failed') {
+      const t = setTimeout(() => setShowBanner(false), 8000);
+      return () => clearTimeout(t);
+    }
   }, [paymentStatus, paymentCod]);
 
   const { data, isLoading } = useQuery({
@@ -59,30 +63,32 @@ export default function OrdersPage() {
           </div>
         </div>
 
-        {/* Thanh toán thành công */}
+        {/* Banner: Thanh toán thành công */}
         {showBanner && (paymentStatus === 'success' || paymentCod === 'cod_success') && (
-          <div className="mb-8 p-4 bg-green-50 border border-green-200 rounded-2xl flex items-center gap-4 text-green-800 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xl">
-              🎉
-            </div>
+          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-4 text-emerald-800 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="w-11 h-11 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0 text-2xl">✅</div>
             <div className="flex-1">
-              <p className="font-extrabold text-base">Thanh toán tự động thành công!</p>
-              <p className="text-sm text-green-700 opacity-90">Hệ thống đã ghi nhận. Kiểm tra trạng thái đơn hàng mới nhất bên dưới nhé.</p>
+              <p className="font-extrabold">{paymentCod === 'cod_success' ? 'Đặt hàng thành công (COD)!' : 'Thanh toán VNPAY thành công! 🎉'}</p>
+              <p className="text-sm text-emerald-700 opacity-80 mt-0.5">{paymentCod === 'cod_success' ? 'Đơn hàng sẽ được giao khi bạn thanh toán.' : 'Hệ thống đã ghi nhận. Đơn hàng của bạn đang được xử lý.'}</p>
             </div>
-            <button onClick={() => setShowBanner(false)} className="text-green-500 hover:text-green-700 font-bold text-xl leading-none">×</button>
+            <button onClick={() => setShowBanner(false)} className="text-emerald-400 hover:text-emerald-700 text-xl font-bold leading-none">×</button>
           </div>
         )}
-        {paymentStatus === 'failed' && (
-          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-4 text-red-800">
-            <div className="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xl">
-              ⚠️
+
+        {/* Banner: Thanh toán thất bại / bị hủy */}
+        {showBanner && paymentStatus === 'failed' && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-4 text-red-800 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="w-11 h-11 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 text-2xl">⚠️</div>
+            <div className="flex-1">
+              <p className="font-extrabold">Thanh toán VNPAY không thành công</p>
+              <p className="text-sm text-red-700 opacity-80 mt-0.5">Giao dịch bị hủy hoặc xảy ra lỗi. Đơn hàng chưa được thanh toán. Vui lòng thử lại.</p>
             </div>
-            <div>
-              <p className="font-extrabold text-base">Thanh toán thất bại!</p>
-              <p className="text-sm text-red-700 opacity-90">Giao dịch bị từ chối. Vui lòng kiểm tra và thử lại.</p>
-            </div>
+            <button onClick={() => setShowBanner(false)} className="text-red-400 hover:text-red-700 text-xl font-bold leading-none">×</button>
+          </div>
           </div>
         )}
+
+
 
         {isLoading ? (
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary-600" size={32} /></div>
