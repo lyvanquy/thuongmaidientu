@@ -4,6 +4,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { PrismaService } from '../prisma/prisma.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CompanyService } from '../company/company.service';
 import { ProductService } from '../product/product.service';
 import { Role } from '@prisma/client';
@@ -42,8 +43,12 @@ export class AdminController {
 
   @Patch('companies/:id/verify')
   @ApiOperation({ summary: 'Xác thực doanh nghiệp' })
-  verifyCompany(@Param('id') id: string, @Query('status') status: string) {
-    return this.companyService.verify(id, status || 'VERIFIED');
+  verifyCompany(
+    @Param('id') id: string, 
+    @CurrentUser('id') adminId: string, 
+    @Body() body: { status: string; notes?: string }
+  ) {
+    return this.companyService.verify(adminId, id, body.status || 'VERIFIED', body.notes);
   }
 
   @Get('products')

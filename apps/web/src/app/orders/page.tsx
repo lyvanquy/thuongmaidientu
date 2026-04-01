@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ShoppingBag, Loader2, Package, Truck, CheckCircle, XCircle, Clock, ChevronRight, Home } from 'lucide-react';
+import { ShipmentTimeline } from '@/components/shipment/ShipmentTimeline';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   PENDING:   { label: 'Chờ xác nhận', color: 'text-yellow-700', bg: 'bg-yellow-100', icon: Clock },
@@ -84,7 +85,6 @@ export default function OrdersPage() {
               <p className="text-sm text-red-700 opacity-80 mt-0.5">Giao dịch bị hủy hoặc xảy ra lỗi. Đơn hàng chưa được thanh toán. Vui lòng thử lại.</p>
             </div>
             <button onClick={() => setShowBanner(false)} className="text-red-400 hover:text-red-700 text-xl font-bold leading-none">×</button>
-          </div>
           </div>
         )}
 
@@ -218,16 +218,9 @@ function OrderDetail({ order }: { order: any }) {
         </div>
       )}
 
-      {/* Shipment info */}
+      {/* Shipment Tracking Timeline */}
       {order.shipment && (
-        <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3 bg-cyan-50">
-          <Truck size={18} className="text-cyan-600" />
-          <div className="text-sm">
-            <span className="font-semibold text-slate-800">Mã vận đơn: </span>
-            <span className="font-mono text-cyan-700 font-bold">{order.shipment.trackingNumber || '—'}</span>
-            {order.shipment.carrier && <span className="text-slate-500"> · {order.shipment.carrier}</span>}
-          </div>
-        </div>
+        <ShipmentTimeline orderId={order.id} shipment={order.shipment} />
       )}
 
       {/* Delivery address */}

@@ -36,6 +36,7 @@ model User {
   contractSignatures ContractSignature[]
   sentQuotations Quotation[] @relation("SupplierQuotation")
   otps           Otp[]
+  reviews        Review[]
 }
 
 enum Role {
@@ -101,6 +102,7 @@ model Company {
   industries       CompanyIndustry[]
   media            CompanyMedia[]
   favorites        Favorite[]        @relation("FavoriteCompany")
+  reviews          Review[]          @relation("CompanyReviews")
 }
 
 enum VerificationStatus {
@@ -204,6 +206,7 @@ model Product {
   attributes   ProductAttribute[]
   orderItems   OrderItem[]
   favorites    Favorite[]  @relation("FavoriteProduct")
+  reviews      Review[]
 }
 
 model ProductImage {
@@ -626,4 +629,24 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   user       User?    @relation(fields: [userId], references: [id])
+}
+
+// =====================
+// REVIEW & RATING
+// =====================
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String?
+  companyId String?
+  rating    Int      // 1 to 5
+  comment   String?
+  images    String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  company   Company? @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
 }

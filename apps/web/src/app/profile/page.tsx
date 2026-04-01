@@ -148,9 +148,14 @@ export default function ProfilePage() {
                   <Package size={16} className="text-slate-400" /> Khám phá sản phẩm
                 </Link>
                 {user.role === 'SUPPLIER' && (
-                  <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-primary-50 hover:text-primary-700 text-sm text-slate-700 transition-colors">
-                    <Building2 size={16} className="text-slate-400" /> Supplier Dashboard
-                  </Link>
+                  <>
+                    <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-primary-50 hover:text-primary-700 text-sm text-slate-700 transition-colors">
+                      <Building2 size={16} className="text-slate-400" /> Supplier Dashboard
+                    </Link>
+                    <Link href="/profile/verification" className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-primary-50 hover:text-primary-700 text-sm text-slate-700 transition-colors">
+                      <ShieldCheck size={16} className="text-slate-400" /> Xác thực Doanh nghiệp
+                    </Link>
+                  </>
                 )}
               </div>
             </div>

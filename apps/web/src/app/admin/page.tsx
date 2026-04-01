@@ -9,6 +9,7 @@ import {
   CheckCircle, XCircle, AlertTriangle, TrendingUp, Loader2, Shield
 } from 'lucide-react';
 import { AdminContractDialog } from '@/components/contract/admin-contract-dialog';
+import { KybDialog } from '@/components/admin/kyb-dialog';
 import Link from 'next/link';
 
 type AdminTab = 'overview' | 'companies' | 'products' | 'users' | 'contracts';
@@ -20,6 +21,9 @@ export default function AdminPage() {
   const [tab, setTab] = useState<AdminTab>('overview');
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [showContractDialog, setShowContractDialog] = useState(false);
+  
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [showKybDialog, setShowKybDialog] = useState(false);
 
   if (user && user.role !== 'ADMIN') {
     router.replace('/');
@@ -57,7 +61,7 @@ export default function AdminPage() {
   });
 
   const verifyMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => adminApi.verifyCompany(id, status),
+    mutationFn: ({ id, status, notes }: { id: string; status: string, notes?: string }) => adminApi.verifyCompany(id, status, notes),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-companies'] }),
   });
 
@@ -211,20 +215,15 @@ export default function AdminPage() {
                           </td>
                           <td className="px-5 py-3 text-right">
                             {c.verificationStatus === 'PENDING' && (
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  onClick={() => verifyMutation.mutate({ id: c.id, status: 'VERIFIED' })}
-                                  className="p-1.5 text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition"
-                                >
-                                  <CheckCircle size={16} />
-                                </button>
-                                <button
-                                  onClick={() => verifyMutation.mutate({ id: c.id, status: 'REJECTED' })}
-                                  className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition"
-                                >
-                                  <XCircle size={16} />
-                                </button>
-                              </div>
+                              <button
+                                onClick={() => {
+                                  setSelectedCompanyId(c.id);
+                                  setShowKybDialog(true);
+                                }}
+                                className="px-3 py-1.5 text-xs font-bold text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100 transition shadow-sm border border-primary-200"
+                              >
+                                Duyệt hồ sơ
+                              </button>
                             )}
                           </td>
                         </tr>
@@ -427,6 +426,12 @@ export default function AdminPage() {
         onClose={() => setShowContractDialog(false)}
         contractId={selectedContractId}
         onDecide={handleContractDecision}
+      />
+      <KybDialog
+        isOpen={showKybDialog}
+        onClose={() => setShowKybDialog(false)}
+        companyId={selectedCompanyId}
+        onDecide={(status: string, notes: string) => verifyMutation.mutate({ id: selectedCompanyId as string, status, notes })}
       />
     </div>
   );

@@ -8,6 +8,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth.store';
 import { RfqModal } from '@/components/rfq/rfq-modal';
+import { ReviewSection } from '@/components/review/ReviewSection';
 
 export default function ProductDetailsPage() {
   const { id } = useParams();
@@ -191,6 +192,9 @@ export default function ProductDetailsPage() {
                 {product.description || 'Chưa cập nhật chi tiết'}
               </div>
             </div>
+
+            {/* Đánh giá */}
+            <ReviewSection productId={product.id} type="product" />
           </div>
 
           {/* Cột phải: Thông tin Nhà cung cấp */}

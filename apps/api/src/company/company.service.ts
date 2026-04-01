@@ -2,12 +2,17 @@ import {
   Injectable, NotFoundException, ForbiddenException, ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationService } from '../notification/notification.service';
+import { VerificationStatus, NotificationType } from '@prisma/client';
 import { CreateCompanyDto, UpdateCompanyDto } from './dto/company.dto';
 import slugify from 'slugify';
 
 @Injectable()
 export class CompanyService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notification: NotificationService
+  ) {}
 
   private makeSlug(name: string) {
     return slugify(name, { lower: true, locale: 'vi', strict: true }) + '-' + Date.now();
@@ -108,11 +113,67 @@ export class CompanyService {
     return this.prisma.company.update({ where: { id }, data: { banner: bannerUrl } });
   }
 
-  async verify(id: string, status: string) {
-    return this.prisma.company.update({
+  async verify(adminId: string, id: string, status: string, notes?: string) {
+    const company = await this.prisma.company.update({
       where: { id },
       data: { verificationStatus: status as any },
     });
+
+    const existingVerification = await this.prisma.companyVerification.findUnique({ where: { companyId: id } });
+    if (existingVerification) {
+       await this.prisma.companyVerification.update({
+         where: { companyId: id },
+         data: {
+           reviewedAt: new Date(),
+           reviewedBy: adminId,
+           notes: notes || existingVerification.notes
+         }
+       });
+    }
+
+    // Gửi thông báo
+    const users = await this.prisma.user.findMany({ where: { companyId: id } });
+    for (const u of users) {
+      if (status === 'VERIFIED') {
+        await this.notification.create(u.id, 'Hồ sơ doanh nghiệp đã được duyệt', 'Chúc mừng! Hồ sơ doanh nghiệp của bạn đã được xác thực thành công. Bạn đã nhận được tích xanh.', NotificationType.INFO, '/profile');
+      } else if (status === 'REJECTED') {
+         await this.notification.create(u.id, 'Hồ sơ doanh nghiệp bị từ chối', `Hồ sơ xác thực của bạn bị từ chối. Lời nhắn từ Admin: ${notes || 'Vui lòng cập nhật lại giấy tờ rõ nét và hợp lệ.'}`, NotificationType.ERROR, '/profile/verification');
+      }
+    }
+
+    return company;
+  }
+
+  async submitVerification(userId: string, companyId: string, documents: string[], notes?: string) {
+    await this.checkOwner(companyId, userId);
+    
+    // Check if there is an existing verification pending
+    const existing = await this.prisma.companyVerification.findUnique({ where: { companyId } });
+    
+    // Update company status to PENDING
+    await this.prisma.company.update({
+      where: { id: companyId },
+      data: { verificationStatus: VerificationStatus.PENDING }
+    });
+
+    if (existing) {
+       return this.prisma.companyVerification.update({
+         where: { companyId },
+         data: { documents, notes, reviewedAt: null, reviewedBy: null }
+       });
+    }
+
+    return this.prisma.companyVerification.create({
+      data: {
+        companyId,
+        documents,
+        notes
+      }
+    });
+  }
+
+  async getVerificationDoc(companyId: string) {
+    return this.prisma.companyVerification.findUnique({ where: { companyId } });
   }
 
   async getDashboardStats(userId: string) {

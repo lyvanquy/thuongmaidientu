@@ -110,6 +110,13 @@ export const paymentApi = {
   createUrl: (orderId: string, method: string) => api.post(`/payments/${orderId}/create-url`, { method }),
 };
 
+// Shipments
+export const shipmentApi = {
+  create: (orderId: string, provider: string) => api.post(`/shipments/order/${orderId}`, { provider }),
+  track: (trackingCode: string) => api.get(`/shipments/track/${trackingCode}`),
+  updateStatus: (shipmentId: string, status: string) => api.patch(`/shipments/${shipmentId}/status`, { status }),
+};
+
 // Chat
 export const chatApi = {
   create: (d: any) => api.post('/chats', d),
@@ -149,7 +156,7 @@ export const adminApi = {
   dashboard: () => api.get('/admin/dashboard'),
   users: (params?: any) => api.get('/admin/users', { params }),
   companies: (params?: any) => api.get('/admin/companies', { params }),
-  verifyCompany: (id: string, status = 'VERIFIED') => api.patch(`/admin/companies/${id}/verify`, null, { params: { status } }),
+  verifyCompany: (id: string, status = 'VERIFIED', notes?: string) => api.patch(`/admin/companies/${id}/verify`, { status, notes }),
   products: (params?: any) => api.get('/admin/products', { params }),
   approveProduct: (id: string) => api.patch(`/admin/products/${id}/approve`),
   rejectProduct: (id: string) => api.patch(`/admin/products/${id}/reject`),

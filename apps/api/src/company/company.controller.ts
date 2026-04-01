@@ -57,6 +57,27 @@ export class CompanyController {
     return this.companyService.findOne(id);
   }
 
+  @Post(':id/verify/upload')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.SUPPLIER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Nộp hồ sơ xác thực doanh nghiệp (KYB)' })
+  submitVerification(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() body: { documents: string[]; notes?: string }
+  ) {
+    return this.companyService.submitVerification(userId, id, body.documents, body.notes);
+  }
+
+  @Get(':id/verification')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Xem trạng thái hồ sơ xác thực' })
+  getVerificationDoc(@Param('id') id: string) {
+    return this.companyService.getVerificationDoc(id);
+  }
+
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
